@@ -17,7 +17,9 @@ class Player(
 
     override def hashCode: Int = name.hashCode
 
-    override def toString: String = name
+    override def toString: String = {
+        s"[$name], score: $score, prev white games: $numWhiteGames, prev black games: $numBlackGames\n"
+    }
 }
 
 enum Pairing:
@@ -32,7 +34,9 @@ def samplePlayerList: Seq[Player] = {
         Player("D"),
         Player("E"),
         Player("F"),
-        Player("G")
+        Player("G"),
+        Player("H"),
+        Player("I")
     )
 }
 
@@ -61,19 +65,28 @@ def assignMonradRankings(playerList: Seq[Player]): Unit = {
     }
 }
 
+def assertNotTooManyRounds(playerList: Seq[Player], numRounds: Int): Unit = {
+    if (playerList.size < numRounds)
+        println("More rounds than participants. Stopping.")
+        throw new IllegalArgumentException
+}
+
 @main def main = {
+
+    var previousPairings = Set.empty[Pairing]
+
+    val numRounds = 9
 
     val playerList = samplePlayerList
     assertNotTooManyPlayers(playerList)
     assertNoDuplicateNames(playerList)
+    assertNotTooManyRounds(playerList, numRounds)
     assignRandomSeeds(playerList)
 
-    var previousPairings = Set.empty[Pairing]
-
-    val numRounds = 4
     for
         round <- (1 to numRounds)
     do
+        println(s"Start of round $round")
         assignMonradRankings(playerList)
 
         val possiblePairings = generatePairings(playerList)
@@ -81,7 +94,7 @@ def assignMonradRankings(playerList: Seq[Player]): Unit = {
         val legalPairings = filterIllegalPairings(possiblePairings, previousPairings)
 
         val chosenPairingList = selectOptimalPairing(legalPairings)
-        
+
         println(s"Pairings: $chosenPairingList")
 
         previousPairings ++= chosenPairingList.toSet
@@ -89,11 +102,17 @@ def assignMonradRankings(playerList: Seq[Player]): Unit = {
         updateColorCounts(chosenPairingList)
 
         // update the scores somehow
+        chosenPairingList.foreach{
+            case Pairing.Game(white, black) => white.score += 1
+            case Pairing.Bye(_) => {}
+        }
 
         chosenPairingList.foreach{
             case Pairing.Game(_, _) => {}
             case Pairing.Bye(p) => p.score += 1
         }
+
+        scala.io.StdIn.readLine()
 }
 
 def generatePairings(playerList: Seq[Player]): Seq[Seq[Pairing]] = {
@@ -175,11 +194,17 @@ def filterIllegalPairings(possible: Seq[Seq[Pairing]], previous: Set[Pairing]): 
 def selectOptimalPairing(legalPairings: Seq[Seq[Pairing]]): Seq[Pairing] = {
 
     legalPairings.sortBy(pairingList =>
+        val byeScore = {
+            pairingList.map{
+                case Pairing.Bye(p) => p.score
+                case Pairing.Game(_, _) => 0
+            }.sum
+        }
         val monradScore = {
             pairingList.map{
                 case Pairing.Bye(_) => 0
                 case Pairing.Game(white, black) =>
-                    val gap = white.monradRanking - black.monradRanking
+                    val gap = (white.monradRanking - black.monradRanking).abs - 1
                     gap * gap
             }.sum
         }
@@ -191,7 +216,7 @@ def selectOptimalPairing(legalPairings: Seq[Seq[Pairing]]): Seq[Pairing] = {
                     black.numBlackGames - black.numWhiteGames)
             }.sum
         }
-        (monradScore, colorScore)
+        (byeScore, monradScore, colorScore)
     ).head
 }
 

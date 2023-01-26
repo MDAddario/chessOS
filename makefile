@@ -1,7 +1,7 @@
 all: main.jar
 
-main.jar: main.scala
-	scalac main.scala -d main.jar -deprecation -explain
+main.jar: bracket.scala database.scala elo.scala gui.scala
+	scalac *.scala -d main.jar -deprecation -explain
 
 run: main.jar
 	scala main.jar

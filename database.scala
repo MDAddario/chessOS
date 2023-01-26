@@ -3,11 +3,24 @@ package chessOS
 import java.io._
 import java.time._
 
-case class Player (
-    name:        String,
-    elo:         Int = 1500,
-    gamesPlayed: Int = 0
-)
+class Player (
+    val name:        String,
+    var elo:         Int = 1500,
+    var gamesPlayed: Int = 0
+) {
+    override def hashCode: Int = name.hashCode
+
+    override def equals(that: Any): Boolean = {
+        that match
+            case that: Player => name == that.name
+            case _ => false
+    }
+
+    override def toString: String = {
+        val suffix = if (gamesPlayed < 10) "?" else ""
+        s"${name} (${elo}${suffix})"
+    }
+}
 
 enum Outcome:
     case White, Draw, Black
@@ -96,10 +109,14 @@ def addPlayer(name: String): Unit = {
         val newPlayer = Player(name)
         val newPlayerList = playerList :+ newPlayer
 
-        val playerRegistryFile = new FileWriter(new File(playerRegistryFname))
-        newPlayerList.foreach(p => playerRegistryFile.write(
-            s"${p.name};${p.elo};${p.gamesPlayed}\n"
-        ))
-        playerRegistryFile.close()
+        savePlayers(newPlayerList)
         println(s"[SUCCESS]: Player \"$name\" has been added.")
+}
+
+def savePlayers(playerList: Seq[Player]): Unit = {
+    val playerRegistryFile = new FileWriter(new File(playerRegistryFname))
+    playerList.foreach(p => playerRegistryFile.write(
+        s"${p.name};${p.elo};${p.gamesPlayed}\n"
+    ))
+    playerRegistryFile.close()
 }

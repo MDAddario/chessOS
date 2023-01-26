@@ -103,27 +103,3 @@ def addPlayer(name: String): Unit = {
         playerRegistryFile.close()
         println(s"[SUCCESS]: Player \"$name\" has been added.")
 }
-
-@main def main = {
-
-    addPlayer("Michael")
-    addPlayer("Chany")
-    addPlayer("Guido")
-
-    val playerList = loadPlayers
-    val michael = playerList(0)
-    val chany = playerList(1)
-    val guido = playerList(2)
-
-    addResult(1, Pairing.Game(michael, chany), Some(Outcome.White))
-    addResult(1, Pairing.Bye(guido), None)
-
-    addResult(2, Pairing.Game(guido, michael), Some(Outcome.Draw))
-    addResult(2, Pairing.Bye(chany), None)
-
-    addResult(3, Pairing.Game(chany, guido), Some(Outcome.Black))
-    addResult(3, Pairing.Bye(michael), None)
-
-    val resultList = loadResults
-    println(s"$resultList")
-}

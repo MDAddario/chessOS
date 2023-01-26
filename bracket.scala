@@ -70,20 +70,41 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
         val possiblePairings = generatePairings(playerList)
         val legalPairings = filterIllegalPairings(possiblePairings, previousPairings)
         val chosenPairingList = selectOptimalPairing(legalPairings)
-        chosenPairingList.foreach(p => println(s"Round $round pairing: $p"))
+
+        val outcomes = scala.collection.mutable.Seq.fill(chosenPairingList.size)(None: Option[Outcome])
+        while (!areAllOutcomesPresent(chosenPairingList, outcomes)) {
+
+            chosenPairingList.zipWithIndex.foreach{
+                case (pairing, index) => println(s"Pairing #${index+1}: $pairing")
+            }
+
+            print("Enter pairing index: ")
+            val index = scala.io.StdIn.readLine.toInt - 1
+
+            chosenPairingList(index) match
+                case _: BracketPairing.Bye =>
+                    println("Cannot set the outcome of a bye")
+                case _: BracketPairing.Game =>
+                    print("Please indicate the outcome (white/draw/black): ")
+                    val outcome = scala.io.StdIn.readLine
+                    outcome match
+                        case "white" =>
+                            outcomes(index) = Some(Outcome.White)
+                        case "draw" =>
+                            outcomes(index) = Some(Outcome.Draw)
+                        case "black" =>
+                            outcomes(index) = Some(Outcome.Black)
+                        case _ =>
+                            println("Outcome unrecognized. Please enter \"white\", \"draw\", or \"black\".")
+        }
 
         previousPairings ++= chosenPairingList.toSet
         updateColorCounts(chosenPairingList)
         updateByeResult(chosenPairingList)
+        updateScoresElosGamesPlayed(chosenPairingList, outcomes)
+        updateDatabases(round, playerList, chosenPairingList, outcomes)
 
-        // record all outcomes of games
-        // update player scores
-        // update player elos
-        // update player gamesPlayed
-        // print standings
-        // update both databases
-
-        scala.io.StdIn.readLine
+        println(s"${playerList.sortBy(_.doubleScore)}")
 }
 
 def generatePairings(playerList: Seq[BracketPlayer]): Seq[Seq[BracketPairing]] = {
@@ -206,5 +227,69 @@ def updateByeResult(chosenPairingList: Seq[BracketPairing]): Unit = {
     chosenPairingList.foreach{
         case BracketPairing.Game(_, _) => {}
         case BracketPairing.Bye(p) => p.doubleScore += 2
+    }
+}
+
+def areAllOutcomesPresent(
+    chosenPairingList: Seq[BracketPairing],
+    outcomes: scala.collection.mutable.Seq[Option[Outcome]]): Boolean = {
+
+    chosenPairingList.zip(outcomes).map{
+        case (pairing, outcome) => pairing match
+            case _: BracketPairing.Bye => true
+            case _: BracketPairing.Game => outcome match
+                case Some(_) => true
+                case None => false
+    }.forall(identity)
+}
+
+def updateScoresElosGamesPlayed(
+    chosenPairingList: Seq[BracketPairing],
+    outcomes: scala.collection.mutable.Seq[Option[Outcome]]): Unit = {
+
+    chosenPairingList.zip(outcomes).map{
+        case (pairing, outcome) => outcome match
+            case None => {}
+            case Some(Outcome.White) => pairing match
+                case BracketPairing.Bye(_) => {}
+                case BracketPairing.Game(white, black) =>
+                    white.doubleScore += 2
+                    white.player.elo = newElo(white.player, black.player, 2)
+                    black.player.elo = newElo(black.player, white.player, 0)
+                    white.player.gamesPlayed += 1
+                    black.player.gamesPlayed += 1
+            case Some(Outcome.Draw) => pairing match
+                case BracketPairing.Bye(_) => {}
+                case BracketPairing.Game(white, black) =>
+                    white.doubleScore += 1
+                    black.doubleScore += 1
+                    white.player.elo = newElo(white.player, black.player, 1)
+                    black.player.elo = newElo(black.player, white.player, 1)
+                    white.player.gamesPlayed += 1
+                    black.player.gamesPlayed += 1
+            case Some(Outcome.Black) => pairing match
+                case BracketPairing.Bye(_) => {}
+                case BracketPairing.Game(white, black) =>
+                    black.doubleScore += 2
+                    white.player.elo = newElo(white.player, black.player, 0)
+                    black.player.elo = newElo(black.player, white.player, 2)
+                    white.player.gamesPlayed += 1
+                    black.player.gamesPlayed += 1
+    }
+}
+
+def updateDatabases(
+    round: Int,
+    playerList: Seq[BracketPlayer],
+    chosenPairingList: Seq[BracketPairing],
+    outcomes: scala.collection.mutable.Seq[Option[Outcome]]): Unit = {
+
+    savePlayers(playerList.map(_.player))
+    chosenPairingList.zip(outcomes).map{
+        case (pairing, outcome) => pairing.match
+            case BracketPairing.Bye(p) =>
+                addResult(round, Pairing.Bye(p.player), None)
+            case BracketPairing.Game(w, b) =>
+                addResult(round, Pairing.Game(w.player, b.player), outcome)
     }
 }

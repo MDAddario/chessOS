@@ -24,7 +24,12 @@ class BracketPlayer (
     }
 
     override def toString: String = {
-        s"${player} ${doubleScore/2.0} pts"
+        if (doubleScore == 2)
+            s"${player} ${doubleScore/2} pt"
+        else if (doubleScore % 2 == 0)
+            s"${player} ${doubleScore/2} pts"
+        else
+            s"${player} ${doubleScore/2.0} pts"
     }
 }
 
@@ -64,7 +69,7 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
     for
         round <- (1 to numRounds)
     do
-        println(s"Start of round $round\n")
+        println(s"\n== ROUND $round ==")
         assignMonradRankings(playerList)
 
         val possiblePairings = generatePairings(playerList)
@@ -74,28 +79,34 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
         val outcomes = scala.collection.mutable.Seq.fill(chosenPairingList.size)(None: Option[Outcome])
         while (!areAllOutcomesPresent(chosenPairingList, outcomes)) {
 
+            println()
             chosenPairingList.zipWithIndex.foreach{
                 case (pairing, index) => println(s"Pairing #${index+1}: $pairing")
             }
 
-            print("Enter pairing index: ")
-            val index = scala.io.StdIn.readLine.toInt - 1
-
-            chosenPairingList(index) match
-                case _: BracketPairing.Bye =>
-                    println("Cannot set the outcome of a bye")
-                case _: BracketPairing.Game =>
-                    print("Please indicate the outcome (white/draw/black): ")
-                    val outcome = scala.io.StdIn.readLine
-                    outcome match
-                        case "white" =>
-                            outcomes(index) = Some(Outcome.White)
-                        case "draw" =>
-                            outcomes(index) = Some(Outcome.Draw)
-                        case "black" =>
-                            outcomes(index) = Some(Outcome.Black)
-                        case _ =>
-                            println("Outcome unrecognized. Please enter \"white\", \"draw\", or \"black\".")
+            print("\nEnter pairing index: ")
+            try
+                val index = scala.io.StdIn.readLine.toInt - 1
+                chosenPairingList(index) match
+                    case _: BracketPairing.Bye =>
+                        println("[ERROR]: Cannot set the outcome of a bye")
+                    case _: BracketPairing.Game =>
+                        print("Please indicate the outcome (white/draw/black): ")
+                        val outcome = scala.io.StdIn.readLine
+                        outcome match
+                            case "white" =>
+                                outcomes(index) = Some(Outcome.White)
+                            case "draw" =>
+                                outcomes(index) = Some(Outcome.Draw)
+                            case "black" =>
+                                outcomes(index) = Some(Outcome.Black)
+                            case _ =>
+                                println("[ERROR]: Outcome unrecognized. Please enter \"white\", \"draw\", or \"black\".")
+            catch
+                case _: java.lang.NumberFormatException =>
+                    println("[ERROR]: Please enter a valid integer index.")
+                case _: java.lang.IndexOutOfBoundsException =>
+                    println("[ERROR]: Please enter an index that is in bounds.")
         }
 
         previousPairings ++= chosenPairingList.toSet
@@ -104,7 +115,16 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
         updateScoresElosGamesPlayed(chosenPairingList, outcomes)
         updateDatabases(round, playerList, chosenPairingList, outcomes)
 
-        println(s"${playerList.sortBy(_.doubleScore)}")
+        val standings = playerList.groupBy(_.doubleScore).toSeq.sortBy(-_._1).map(_._2).foldLeft(Seq.empty)(
+            (acc: Seq[(Int, BracketPlayer)], value: Seq[BracketPlayer]) => {
+                acc ++ value.map((acc.size+1, _))
+            })
+        println(s"\n== CURRENT STANDINGS ==")
+        standings.foreach{
+            case (rank, player) => println(s"($rank) - $player")
+        }
+        print("\nPress [enter] to continue...")
+        scala.io.StdIn.readLine
 }
 
 def generatePairings(playerList: Seq[BracketPlayer]): Seq[Seq[BracketPairing]] = {

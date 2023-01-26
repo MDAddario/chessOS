@@ -1,12 +1,14 @@
 package chessOS
 
-// add players to registry
-// select which players will play in the tournament
-
 @main def main = {
-    val players = Seq("Michael", "Chany", "Guido")
-    players.foreach(addPlayer(_))
 
+    // register these players into the system
+    val playersToRegister = Seq("Michael", "Chany", "Guido", "Raffi", "Ian")
+    playersToRegister.foreach(addPlayer(_))
+
+    // these players wish to participate in the bracket
+    val allPlayers = loadPlayers
+    val playerList = Seq("Michael", "Chany", "Guido", "Raffi", "Ian").map(getPlayer(_, allPlayers))
     val numRounds = 3
-    runBracket(loadPlayers, numRounds)
+    runBracket(playerList, numRounds)
 }

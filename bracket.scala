@@ -41,7 +41,11 @@ def assertNotTooManyPlayers(playerList: Seq[BracketPlayer]): Unit = {
 }
 
 def assignRandomSeeds(playerList: Seq[BracketPlayer]): Unit = {
-    Random.shuffle(playerList).zipWithIndex.map{
+    println("[DEBUG]: The random seeds are being fucked with. This cannot go in prod.")
+    // Random.shuffle(playerList).zipWithIndex.map{
+    //     case (p, i) => p.randomSeed = i
+    // }
+    playerList.zipWithIndex.map{
         case (p, i) => p.randomSeed = i
     }
 }
@@ -74,10 +78,13 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
         println(s"\n== ROUND $round ==")
         assignMonradRankings(playerList)
 
-        val possiblePairings = generatePairings(playerList)
-        val legalPairings = filterIllegalPairings(possiblePairings, previousPairings)
-        val chosenPairingList = selectOptimalPairing(legalPairings)
-
+        val chosenPairingList = 
+            if (round == 1)
+                generateFirstRoundPairings(playerList)
+            else
+                val possiblePairings = generatePairings(playerList)
+                val legalPairings = filterIllegalPairings(possiblePairings, previousPairings)
+                selectOptimalPairing(legalPairings)
         val outcomes = askUserForOutcomes(chosenPairingList)
 
         previousPairings ++= chosenPairingList.toSet
@@ -89,6 +96,21 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
         printStandings(playerList)
         print("\nPress [enter] to continue...")
         scala.io.StdIn.readLine
+}
+
+def generateFirstRoundPairings(playerList: Seq[BracketPlayer]): Seq[BracketPairing] =
+    _gfrp(playerList.sortBy(_.monradRanking))
+
+def _gfrp(sortedList: Seq[BracketPlayer]): Seq[BracketPairing] = {
+
+    if (sortedList.size == 0)
+        Seq.empty[BracketPairing]
+
+    else if (sortedList.size == 1)
+        Seq(BracketPairing.Bye(sortedList(0)))
+
+    else
+        BracketPairing.Game(sortedList(0), sortedList(1)) +: _gfrp(sortedList.drop(2))
 }
 
 def generatePairings(playerList: Seq[BracketPlayer]): Seq[Seq[BracketPairing]] = {

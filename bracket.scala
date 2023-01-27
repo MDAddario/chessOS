@@ -1,6 +1,7 @@
 package chessOS
 
 import scala.util.Random
+import scala.collection.mutable.{Seq => MutSeq}
 
 enum BracketPairing:
     case Game(white: BracketPlayer, black: BracketPlayer)
@@ -77,38 +78,7 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
         val legalPairings = filterIllegalPairings(possiblePairings, previousPairings)
         val chosenPairingList = selectOptimalPairing(legalPairings)
 
-        val outcomes = scala.collection.mutable.Seq.fill(chosenPairingList.size)(None: Option[Outcome])
-        while (!areAllOutcomesPresent(chosenPairingList, outcomes)) {
-
-            println()
-            chosenPairingList.zipWithIndex.foreach{
-                case (pairing, index) => println(s"Pairing #${index+1}: $pairing")
-            }
-
-            print("\nEnter pairing index: ")
-            try
-                val index = scala.io.StdIn.readLine.toInt - 1
-                chosenPairingList(index) match
-                    case _: BracketPairing.Bye =>
-                        println("[ERROR]: Cannot set the outcome of a bye")
-                    case _: BracketPairing.Game =>
-                        print("Please indicate the outcome (white/draw/black): ")
-                        val outcome = scala.io.StdIn.readLine
-                        outcome match
-                            case "white" =>
-                                outcomes(index) = Some(Outcome.White)
-                            case "draw" =>
-                                outcomes(index) = Some(Outcome.Draw)
-                            case "black" =>
-                                outcomes(index) = Some(Outcome.Black)
-                            case _ =>
-                                println("[ERROR]: Outcome unrecognized. Please enter \"white\", \"draw\", or \"black\".")
-            catch
-                case _: java.lang.NumberFormatException =>
-                    println("[ERROR]: Please enter a valid integer index.")
-                case _: java.lang.IndexOutOfBoundsException =>
-                    println("[ERROR]: Please enter an index that is in bounds.")
-        }
+        val outcomes = askUserForOutcomes(chosenPairingList)
 
         previousPairings ++= chosenPairingList.toSet
         updateColorCounts(chosenPairingList)
@@ -116,14 +86,7 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
         updateScoresElosGamesPlayed(chosenPairingList, outcomes)
         updateDatabases(round, playerList, chosenPairingList, outcomes)
 
-        val standings = playerList.groupBy(_.doubleScore).toSeq.sortBy(-_._1).map(_._2).foldLeft(Seq.empty)(
-            (acc: Seq[(Int, BracketPlayer)], value: Seq[BracketPlayer]) => {
-                acc ++ value.map((acc.size+1, _))
-            })
-        println(s"\n== CURRENT STANDINGS ==")
-        standings.foreach{
-            case (rank, player) => println(s"($rank) - $player")
-        }
+        printStandings(playerList)
         print("\nPress [enter] to continue...")
         scala.io.StdIn.readLine
 }
@@ -336,4 +299,51 @@ def resumeBracket(playerList: Seq[BracketPlayer]): Set[BracketPairing] = {
         case Pairing.Game(w, b) => BracketPairing.Game(BracketPlayer(w), BracketPlayer(b))
         case Pairing.Bye(p) => BracketPairing.Bye(BracketPlayer(p))
     )
+}
+
+def printStandings(playerList: Seq[BracketPlayer]): Unit = {
+    val standings = playerList.groupBy(_.doubleScore).toSeq.sortBy(-_._1).map(_._2).foldLeft(Seq.empty)(
+        (acc: Seq[(Int, BracketPlayer)], value: Seq[BracketPlayer]) => {
+            acc ++ value.map((acc.size+1, _))
+        })
+    println(s"\n== CURRENT STANDINGS ==")
+    standings.foreach{
+        case (rank, player) => println(s"($rank) - $player")
+    }
+}
+
+def askUserForOutcomes(chosenPairingList: Seq[BracketPairing]): MutSeq[Option[Outcome]] = {
+    val outcomes = MutSeq.fill(chosenPairingList.size)(None: Option[Outcome])
+    while (!areAllOutcomesPresent(chosenPairingList, outcomes)) {
+
+        println()
+        chosenPairingList.zipWithIndex.foreach{
+            case (pairing, index) => println(s"Pairing #${index+1}: $pairing")
+        }
+
+        print("\nEnter pairing index: ")
+        try
+            val index = scala.io.StdIn.readLine.toInt - 1
+            chosenPairingList(index) match
+                case _: BracketPairing.Bye =>
+                    println("[ERROR]: Cannot set the outcome of a bye")
+                case _: BracketPairing.Game =>
+                    print("Please indicate the outcome (white/draw/black): ")
+                    val outcome = scala.io.StdIn.readLine
+                    outcome match
+                        case "white" =>
+                            outcomes(index) = Some(Outcome.White)
+                        case "draw" =>
+                            outcomes(index) = Some(Outcome.Draw)
+                        case "black" =>
+                            outcomes(index) = Some(Outcome.Black)
+                        case _ =>
+                            println("[ERROR]: Outcome unrecognized. Please enter \"white\", \"draw\", or \"black\".")
+        catch
+            case _: java.lang.NumberFormatException =>
+                println("[ERROR]: Please enter a valid integer index.")
+            case _: java.lang.IndexOutOfBoundsException =>
+                println("[ERROR]: Please enter an index that is in bounds.")
+    }
+    outcomes
 }

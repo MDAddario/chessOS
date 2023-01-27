@@ -25,3 +25,6 @@ ___
 * When generating all pairings, don't specify who is white and who is black, allow either player to be either color, unless one player must play a color, then specify that the colors are locked
 
 * Also, ELOs should be updated all at once
+___
+## Technical debt list
+* Instead of using Option[Outcome], just add Bye as a case of Outcome

@@ -64,7 +64,8 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
     assertNotTooManyRounds(playerList, numRounds)
     assignRandomSeeds(playerList)
 
-    var previousPairings = Set.empty[BracketPairing]
+    val resumePausedBracket = false
+    var previousPairings = if (resumePausedBracket) resumeBracket(playerList) else Set.empty[BracketPairing]
 
     for
         round <- (1 to numRounds)
@@ -312,4 +313,27 @@ def updateDatabases(
             case BracketPairing.Game(w, b) =>
                 addResult(round, Pairing.Game(w.player, b.player), outcome)
     }
+}
+
+def resumeBracket(playerList: Seq[BracketPlayer]): Set[BracketPairing] = {
+    val oldResults = loadResults
+
+    oldResults.foreach{ pairingResult => 
+    (pairingResult.outcome, pairingResult.pairing) match
+        case (Some(Outcome.White), Pairing.Game(w,b)) =>
+            playerList.filter(_.player == w).head.doubleScore += 2
+        case (Some(Outcome.Draw), Pairing.Game(w,b)) => 
+            playerList.filter(_.player == w).head.doubleScore += 1
+            playerList.filter(_.player == b).head.doubleScore += 1
+        case (Some(Outcome.Black), Pairing.Game(w,b)) => 
+            playerList.filter(_.player == b).head.doubleScore += 2
+        case (None, Pairing.Bye(p)) =>
+            playerList.filter(_.player == p).head.doubleScore += 2
+        case _ => {}
+    }
+
+    oldResults.toSet.map(_.pairing match
+        case Pairing.Game(w, b) => BracketPairing.Game(BracketPlayer(w), BracketPlayer(b))
+        case Pairing.Bye(p) => BracketPairing.Bye(BracketPlayer(p))
+    )
 }

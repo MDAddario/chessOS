@@ -8,7 +8,7 @@ package chessOS
 
     // these players wish to participate in the bracket
     val allPlayers = loadPlayers
-    val playerList = Seq("Michael", "Chany", "Guido", "Raffi", "Ian").map(getPlayer(_, allPlayers))
+    val playerList = playersToRegister.map(getPlayer(_, allPlayers))
     val numRounds = 3
     runBracket(playerList, numRounds)
 }

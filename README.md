@@ -17,4 +17,11 @@ ___
 * Aim for players to play equal games as white as black
 * Alternating colors is ideal
 * Cannot play the same color 3 rounds in a row
+___
+## Bracket generation improvements
+* At round 1, simply create the bracket as (#1,#2),(#3,#4),...
+* Instead of generating all pairings and then filtering out legal ones, filter by legality while generating all pairings
+* Stop generating duplicate pairing sequences, i.e. pairing (Pano,Ian) then (Michael,Chany) is the same as first pairing (Michael,Chany) then (Pano,Ian)
+* When generating all pairings, don't specify who is white and who is black, allow either player to be either color, unless one player must play a color, then specify that the colors are locked
 
+* Also, ELOs should be updated all at once

@@ -18,11 +18,5 @@ ___
 * Alternating colors is ideal
 * Cannot play the same color 3 rounds in a row
 ___
-## Bracket generation improvements
-* First round rapid bracket generation
-* Early prunning by determining legality during pairing generation
-* Lazy color selection
-* Combinatorial generator avoids duplicates
-___
 ## Technical debt list
 * Instead of using Option[Outcome], just add Bye as a case of Outcome

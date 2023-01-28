@@ -38,7 +38,7 @@ class BracketPlayer (
 }
 
 def assertNotTooManyPlayers(playerList: Seq[BracketPlayer]): Unit = {
-    if (playerList.size > 9)
+    if (playerList.size > 16)
         println("Too many players. Stopping.")
         throw new IllegalArgumentException
 }
@@ -111,8 +111,8 @@ def _gfrp(sortedList: Seq[BracketPlayer]): Seq[BracketPairing] = {
     sortedList.size match
         case 0 =>
             Seq.empty[BracketPairing]
-        case 1 =>
-            Seq(BracketPairing.Bye(sortedList(0)))
+        case n if (n % 2 == 1) =>
+            BracketPairing.Bye(sortedList(0)) +: _gfrp(sortedList.drop(1))
         case _ =>
             BracketPairing.Game(sortedList(0), sortedList(1)) +: _gfrp(sortedList.drop(2))
 }
@@ -131,7 +131,7 @@ def _mlp(playerList: Seq[BracketPlayer], previousPairings: Set[BracketPairing]):
     playerList.size match
         case 0 =>
             Seq(Some(Seq.empty))
-        case size if (size % 2 == 1) =>
+        case n if (n % 2 == 1) =>
             playerList.flatMap(p =>
 
                 if (previousPairings.contains(BracketPairing.Bye(p)))

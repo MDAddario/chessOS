@@ -15,6 +15,9 @@ class BracketPlayer (
     var monradRanking: Int = 0
     var numWhiteGames: Int = 0
     var numBlackGames: Int = 0
+    
+    def canPlayWhite = (numWhiteGames - numBlackGames) < 2
+    def canPlayBlack = (numBlackGames - numWhiteGames) < 2
 
     override def hashCode: Int = player.hashCode
 
@@ -82,8 +85,10 @@ def runBracket(signupList: Seq[Player], numRounds: Int) = {
             if (round == 1)
                 generateFirstRoundPairings(playerList)
             else
-                val possiblePairings = generatePairings(playerList)
-                val legalPairings = filterIllegalPairings(possiblePairings, previousPairings)
+                val legalPairings = makeLegalPairings(playerList, previousPairings)
+                println(s"[DEBUG]: Number of legal pairings: ${legalPairings.size}")
+                val uniques = legalPairings.map(_.toSet).toSet
+                println(s"[DEBUG]: Number of non-duplicates: ${uniques.size}")
                 selectOptimalPairing(legalPairings)
         val outcomes = askUserForOutcomes(chosenPairingList)
 
@@ -103,97 +108,89 @@ def generateFirstRoundPairings(playerList: Seq[BracketPlayer]): Seq[BracketPairi
 
 def _gfrp(sortedList: Seq[BracketPlayer]): Seq[BracketPairing] = {
 
-    if (sortedList.size == 0)
-        Seq.empty[BracketPairing]
-
-    else if (sortedList.size == 1)
-        Seq(BracketPairing.Bye(sortedList(0)))
-
-    else
-        BracketPairing.Game(sortedList(0), sortedList(1)) +: _gfrp(sortedList.drop(2))
+    sortedList.size match
+        case 0 =>
+            Seq.empty[BracketPairing]
+        case 1 =>
+            Seq(BracketPairing.Bye(sortedList(0)))
+        case _ =>
+            BracketPairing.Game(sortedList(0), sortedList(1)) +: _gfrp(sortedList.drop(2))
 }
 
-def generatePairings(playerList: Seq[BracketPlayer]): Seq[Seq[BracketPairing]] = {
-    if (playerList.size % 2 == 0)
-        evenPairings(playerList)
-    else
-        playerList.flatMap(byePlayer =>
-            val remainingPlayers = playerList.filter(_ != byePlayer)
-            evenPairings(remainingPlayers).map(pairingList =>
-                BracketPairing.Bye(byePlayer) +: pairingList
-            )
-        )
-}
+enum PotentialPairing:
+    case ColorsAmbiguous(p1: BracketPlayer, p2: BracketPlayer)
+    case ColorsFixed(w: BracketPlayer, b: BracketPlayer)
+    case Bye(p: BracketPlayer)
 
-def evenPairings(playerList: Seq[BracketPlayer]): Seq[Seq[BracketPairing]] = {
-    if (playerList.size == 2) {
-        Seq(
-            Seq(BracketPairing.Game(playerList(0), playerList(1))),
-            Seq(BracketPairing.Game(playerList(1), playerList(0)))
-        )
-    } else {
-        playerList.flatMap(playerOne =>
-            val remainingOne = playerList.filter(_ != playerOne)
-            remainingOne.flatMap(playerTwo =>
-                val remainingTwo = remainingOne.filter(_ != playerTwo)
-                evenPairings(remainingTwo).flatMap(pairingList =>
-                    Seq(
-                        BracketPairing.Game(playerOne, playerTwo) +: pairingList,
-                        BracketPairing.Game(playerTwo, playerOne) +: pairingList,
-                    )
+def makeLegalPairings(playerList: Seq[BracketPlayer], previousPairings: Set[BracketPairing]):
+    Seq[Seq[PotentialPairing]] = {
+    
+    _mlp(playerList, previousPairings).filter{
+        case Some(_) => true
+        case None => false
+    }.map(_.get)
+}
+def _mlp(playerList: Seq[BracketPlayer], previousPairings: Set[BracketPairing]): 
+    Seq[Option[Seq[PotentialPairing]]] = {
+
+    playerList.size match
+        case 0 =>
+            Seq(Some(Seq.empty))
+        case 1 =>
+            val p = playerList(0)
+            if (previousPairings.contains(BracketPairing.Bye(p)))
+                Seq(None)
+            else
+                Seq(Some(Seq(PotentialPairing.Bye(p))))
+        case _ =>
+            playerList.flatMap(p1 =>
+                val oneRemoved = playerList.filter(_ != p1)
+                oneRemoved.flatMap(p2 =>
+                    val twoRemoved = oneRemoved.filter(_ != p2)
+
+                    if (previousPairings.contains(BracketPairing.Game(p1,p2)) || 
+                        previousPairings.contains(BracketPairing.Game(p2,p1)))
+                        Seq(None)
+                    else
+                        _mlp(twoRemoved, previousPairings).flatMap{
+                            case None =>
+                                Seq(None)
+                            case Some(pairingList) =>
+
+                                val forward = p1.canPlayWhite && p2.canPlayBlack
+                                val reverse = p2.canPlayWhite && p1.canPlayBlack
+
+                                (forward, reverse) match
+                                    case (false, false) =>
+                                        Seq(None)
+                                    case (true, false) =>
+                                        Seq(Some(PotentialPairing.ColorsFixed(p1,p2) +: pairingList))
+                                    case (false, true) =>
+                                        Seq(Some(PotentialPairing.ColorsFixed(p2,p1) +: pairingList))
+                                    case (true, true) =>
+                                        Seq(Some(PotentialPairing.ColorsAmbiguous(p1,p2) +: pairingList))
+                        }
                 )
             )
-        )
-    }
 }
 
-def filterIllegalPairings(
-    possible: Seq[Seq[BracketPairing]],
-    previous: Set[BracketPairing]): Seq[Seq[BracketPairing]] = {
-
-    possible
-        .filter(pairingList =>
-            val proposedBye = pairingList.filter{
-                case _: BracketPairing.Bye => true
-                case _: BracketPairing.Game => false
-            }
-            if (proposedBye.size == 0)
-                true
+def optimalColors(potensh: PotentialPairing): BracketPairing = {
+    potensh match
+        case PotentialPairing.Bye(p) =>
+            BracketPairing.Bye(p)
+        case PotentialPairing.ColorsFixed(w, b) =>
+            BracketPairing.Game(w, b)
+        case PotentialPairing.ColorsAmbiguous(p1, p2) =>
+            val p1IsWhite = (p1.numBlackGames - p1.numWhiteGames) > (p2.numBlackGames - p2.numWhiteGames)
+            if (p1IsWhite)
+                BracketPairing.Game(p1, p2)
             else
-                !previous.contains(proposedBye(0))
-        )
-        .filter(pairingList =>
-            val proposedGames = pairingList.filter{
-                case _: BracketPairing.Game => true
-                case _: BracketPairing.Bye => false
-            }.map{
-                case BracketPairing.Game(white, black) => Set(white, black)
-                case _ => Set.empty[BracketPlayer]
-            }.toSet
-            
-            val previousGames = previous.filter{
-                case _: BracketPairing.Game => true
-                case _: BracketPairing.Bye => false
-            }.map{
-                case BracketPairing.Game(white, black) => Set(white, black)
-                case _ => Set.empty[BracketPlayer]
-            }
-
-            proposedGames.intersect(previousGames).size == 0
-        )
-        .filter(pairingList =>
-            pairingList.forall{
-                case BracketPairing.Bye(_) => true
-                case BracketPairing.Game(white, black) =>
-                    (white.numWhiteGames - white.numBlackGames < 2 &&
-                    black.numBlackGames - black.numWhiteGames < 2)
-            }
-        )
+                BracketPairing.Game(p2, p1)
 }
 
-def selectOptimalPairing(legalPairings: Seq[Seq[BracketPairing]]): Seq[BracketPairing] = {
+def selectOptimalPairing(legalPairings: Seq[Seq[PotentialPairing]]): Seq[BracketPairing] = {
 
-    legalPairings.sortBy(pairingList =>
+    legalPairings.map(pl => pl.map(optimalColors(_))).sortBy(pairingList =>
         val byeScore = {
             pairingList.map{
                 case BracketPairing.Bye(p) => p.doubleScore
@@ -203,17 +200,16 @@ def selectOptimalPairing(legalPairings: Seq[Seq[BracketPairing]]): Seq[BracketPa
         val monradScore = {
             pairingList.map{
                 case BracketPairing.Bye(_) => 0
-                case BracketPairing.Game(white, black) =>
-                    val gap = (white.monradRanking - black.monradRanking).abs - 1
+                case BracketPairing.Game(w, b) =>
+                    val gap = (w.monradRanking - b.monradRanking).abs - 1
                     gap * gap
             }.sum
         }
         val colorScore = {
             pairingList.map{
                 case BracketPairing.Bye(_) => 0
-                case BracketPairing.Game(white, black) =>
-                    (white.numWhiteGames - white.numBlackGames +
-                    black.numBlackGames - black.numWhiteGames)
+                case BracketPairing.Game(w, b) =>
+                    w.numWhiteGames - w.numBlackGames + b.numBlackGames - b.numWhiteGames
             }.sum
         }
         (byeScore, monradScore, colorScore)
@@ -260,8 +256,10 @@ def updateScoresElosGamesPlayed(
                 case BracketPairing.Bye(_) => {}
                 case BracketPairing.Game(white, black) =>
                     white.doubleScore += 2
-                    white.player.elo = newElo(white.player, black.player, 2)
-                    black.player.elo = newElo(black.player, white.player, 0)
+                    val eloW = newElo(white.player, black.player, 2)
+                    val eloB = newElo(black.player, white.player, 0)
+                    white.player.elo = eloW
+                    black.player.elo = eloB
                     white.player.gamesPlayed += 1
                     black.player.gamesPlayed += 1
             case Some(Outcome.Draw) => pairing match
@@ -269,16 +267,20 @@ def updateScoresElosGamesPlayed(
                 case BracketPairing.Game(white, black) =>
                     white.doubleScore += 1
                     black.doubleScore += 1
-                    white.player.elo = newElo(white.player, black.player, 1)
-                    black.player.elo = newElo(black.player, white.player, 1)
+                    val eloW = newElo(white.player, black.player, 1)
+                    val eloB = newElo(black.player, white.player, 1)
+                    white.player.elo = eloW
+                    black.player.elo = eloB
                     white.player.gamesPlayed += 1
                     black.player.gamesPlayed += 1
             case Some(Outcome.Black) => pairing match
                 case BracketPairing.Bye(_) => {}
                 case BracketPairing.Game(white, black) =>
                     black.doubleScore += 2
-                    white.player.elo = newElo(white.player, black.player, 0)
-                    black.player.elo = newElo(black.player, white.player, 2)
+                    val eloW = newElo(white.player, black.player, 0)
+                    val eloB = newElo(black.player, white.player, 2)
+                    white.player.elo = eloW
+                    black.player.elo = eloB
                     white.player.gamesPlayed += 1
                     black.player.gamesPlayed += 1
     }

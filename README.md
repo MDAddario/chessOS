@@ -20,11 +20,9 @@ ___
 ___
 ## Bracket generation improvements
 * First round rapid bracket generation
-* Instead of generating all pairings and then filtering out legal ones, filter by legality while generating all pairings
+* Early prunning by determining legality during pairing generation
+* Lazy color selection
 * Stop generating duplicate pairing sequences, i.e. pairing (Pano,Ian) then (Michael,Chany) is the same as first pairing (Michael,Chany) then (Pano,Ian)
-* When generating all pairings, don't specify who is white and who is black, allow either player to be either color, unless one player must play a color, then specify that the colors are locked
-
-* Also, ELOs should be updated all at once
 ___
 ## Technical debt list
 * Instead of using Option[Outcome], just add Bye as a case of Outcome

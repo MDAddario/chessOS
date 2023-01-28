@@ -131,45 +131,52 @@ def _mlp(playerList: Seq[BracketPlayer], previousPairings: Set[BracketPairing]):
     playerList.size match
         case 0 =>
             Seq(Some(Seq.empty))
-        case 1 =>
-            val p = playerList(0)
-            if (previousPairings.contains(BracketPairing.Bye(p)))
-                Seq(None)
-            else
-                Seq(Some(Seq(BracketPairing.Bye(p))))
+        case size if (size % 2 == 1) =>
+            playerList.flatMap(p =>
+
+                if (previousPairings.contains(BracketPairing.Bye(p)))
+                    Seq(None)
+                else
+                    val oneRemoved = playerList.filter(_ != p)
+                    _mlp(oneRemoved, previousPairings).flatMap{
+                        case None =>
+                            Seq(None)
+                        case Some(pairingList) =>
+                            Seq(Some(BracketPairing.Bye(p) +: pairingList))
+                    }
+            )
         case _ =>
-            playerList.flatMap(p1 =>
-                val oneRemoved = playerList.filter(_ != p1)
-                oneRemoved.flatMap(p2 =>
+            val p1 = playerList.head
+            val oneRemoved = playerList.drop(1)
+            oneRemoved.flatMap(p2 =>
+
+                if (previousPairings.contains(BracketPairing.Game(p1,p2)) || 
+                    previousPairings.contains(BracketPairing.Game(p2,p1)))
+                    Seq(None)
+                else
                     val twoRemoved = oneRemoved.filter(_ != p2)
+                    _mlp(twoRemoved, previousPairings).flatMap{
+                        case None =>
+                            Seq(None)
+                        case Some(pairingList) =>
 
-                    if (previousPairings.contains(BracketPairing.Game(p1,p2)) || 
-                        previousPairings.contains(BracketPairing.Game(p2,p1)))
-                        Seq(None)
-                    else
-                        _mlp(twoRemoved, previousPairings).flatMap{
-                            case None =>
-                                Seq(None)
-                            case Some(pairingList) =>
+                            val forward = p1.canPlayWhite && p2.canPlayBlack
+                            val reverse = p2.canPlayWhite && p1.canPlayBlack
 
-                                val forward = p1.canPlayWhite && p2.canPlayBlack
-                                val reverse = p2.canPlayWhite && p1.canPlayBlack
-
-                                (forward, reverse) match
-                                    case (false, false) =>
-                                        Seq(None)
-                                    case (true, false) =>
+                            (forward, reverse) match
+                                case (false, false) =>
+                                    Seq(None)
+                                case (true, false) =>
+                                    Seq(Some(BracketPairing.Game(p1,p2) +: pairingList))
+                                case (false, true) =>
+                                    Seq(Some(BracketPairing.Game(p2,p1) +: pairingList))
+                                case (true, true) =>
+                                    val p1IsWhite = (p1.numBlackGames - p1.numWhiteGames) > (p2.numBlackGames - p2.numWhiteGames)
+                                    if (p1IsWhite)
                                         Seq(Some(BracketPairing.Game(p1,p2) +: pairingList))
-                                    case (false, true) =>
+                                    else
                                         Seq(Some(BracketPairing.Game(p2,p1) +: pairingList))
-                                    case (true, true) =>
-                                        val p1IsWhite = (p1.numBlackGames - p1.numWhiteGames) > (p2.numBlackGames - p2.numWhiteGames)
-                                        if (p1IsWhite)
-                                            Seq(Some(BracketPairing.Game(p1,p2) +: pairingList))
-                                        else
-                                            Seq(Some(BracketPairing.Game(p2,p1) +: pairingList))
-                        }
-                )
+                    }
             )
 }
 

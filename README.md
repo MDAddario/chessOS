@@ -22,7 +22,7 @@ ___
 * First round rapid bracket generation
 * Early prunning by determining legality during pairing generation
 * Lazy color selection
-* Stop generating duplicate pairing sequences, i.e. pairing (Pano,Ian) then (Michael,Chany) is the same as first pairing (Michael,Chany) then (Pano,Ian)
+* Combinatorial generator avoids duplicates
 ___
 ## Technical debt list
 * Instead of using Option[Outcome], just add Bye as a case of Outcome
